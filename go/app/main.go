@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,8 +13,18 @@ import (
 	"github.com/labstack/gommon/log"
 )
 
+type Items struct {
+	Items []Item `json:"item"`
+}
+
+type Item struct {
+	Name     string `json:"name"`
+	Category string `json:"category"`
+}
+
 const (
-	ImgDir = "images"
+	ImgDir   = "images"
+	JSONFile = "items.json"
 )
 
 type Response struct {
@@ -25,12 +36,60 @@ func root(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+func getItems() (*Items, error) {
+	jsonItemData, err := os.ReadFile("items.json")
+	if err != nil {
+		return nil, err
+	}
+	var addItems Items
+	// Decode: JSONからItemsに変換
+	if err := json.Unmarshal(jsonItemData, &addItems); err != nil {
+		return nil, err
+	}
+	return &addItems, nil
+}
+
+// ItemsからJSONに変換
+func postItems(items *Items) error {
+	jsonItemData, err := os.Create(JSONFile)
+	if err != nil {
+		return err
+	}
+	defer jsonItemData.Close()
+	// Encode: ItemsからJSONに変換
+
+	encoder := json.NewEncoder(jsonItemData)
+	if err := encoder.Encode(items); err != nil {
+		return err
+	}
+	return nil
+}
+
 func addItem(c echo.Context) error {
 	// Get form data
 	name := c.FormValue("name")
-	c.Logger().Infof("Receive item: %s", name)
+	category := c.FormValue("category")
 
-	message := fmt.Sprintf("item received: %s", name)
+	if name == "" || category == "" {
+		return c.JSON(http.StatusBadRequest,
+			Response{Message: "Name or category cannot be empty"})
+	}
+
+	newItem := Item{Name: name, Category: category}
+	// for debug: Received item
+	fmt.Printf("Received item: %+v\n", newItem)
+	// Read existing items from JSON file
+	items, err := getItems()
+	if err != nil {
+		return err
+	}
+	// Append new item to items
+	items.Items = append(items.Items, newItem)
+	// Write items back to JSON file
+	if err := postItems(items); err != nil {
+		return err
+	}
+	message := fmt.Sprintf("Item received: %s, category: %s", newItem.Name, newItem.Category)
 	res := Response{Message: message}
 
 	return c.JSON(http.StatusOK, res)
@@ -72,8 +131,6 @@ func main() {
 	e.GET("/", root)
 	e.POST("/items", addItem)
 	e.GET("/image/:imageFilename", getImg)
-
-
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
 }
