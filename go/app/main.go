@@ -36,7 +36,7 @@ func root(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
-func getItems() (*Items, error) {
+func readItems() (*Items, error) {
 	jsonItemData, err := os.ReadFile("items.json")
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func getItems() (*Items, error) {
 }
 
 // ItemsからJSONに変換
-func postItems(items *Items) error {
+func writeItems(items *Items) error {
 	jsonItemData, err := os.Create(JSONFile)
 	if err != nil {
 		return err
@@ -79,20 +79,28 @@ func addItem(c echo.Context) error {
 	// for debug: Received item
 	fmt.Printf("Received item: %+v\n", newItem)
 	// Read existing items from JSON file
-	items, err := getItems()
+	items, err := readItems()
 	if err != nil {
 		return err
 	}
 	// Append new item to items
 	items.Items = append(items.Items, newItem)
 	// Write items back to JSON file
-	if err := postItems(items); err != nil {
+	if err := writeItems(items); err != nil {
 		return err
 	}
 	message := fmt.Sprintf("Item received: %s, category: %s", newItem.Name, newItem.Category)
 	res := Response{Message: message}
 
 	return c.JSON(http.StatusOK, res)
+}
+
+func getItems(c echo.Context) error {
+	items, err := readItems()
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, items)
 }
 
 func getImg(c echo.Context) error {
@@ -130,6 +138,7 @@ func main() {
 	// Routes
 	e.GET("/", root)
 	e.POST("/items", addItem)
+	e.GET("/items", getItems)
 	e.GET("/image/:imageFilename", getImg)
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
