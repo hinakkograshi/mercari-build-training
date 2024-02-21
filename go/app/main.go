@@ -1,11 +1,15 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -18,8 +22,10 @@ type Items struct {
 }
 
 type Item struct {
-	Name     string `json:"name"`
-	Category string `json:"category"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Category  string `json:"category"`
+	ImageName string `json:"itemName"`
 }
 
 const (
@@ -37,7 +43,7 @@ func root(c echo.Context) error {
 }
 
 func readItems() (*Items, error) {
-	jsonItemData, err := os.ReadFile("items.json")
+	jsonItemData, err := os.ReadFile(JSONFile)
 	if err != nil {
 		return nil, err
 	}
@@ -49,6 +55,37 @@ func readItems() (*Items, error) {
 	return &addItems, nil
 }
 
+func getItemById(c echo.Context) error {
+	//itemID取得
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.Logger().Errorf("Error geting item id: %s", err)
+	}
+	//ファイルを開くF
+	file, err := os.Open(JSONFile)
+	if err != nil {
+		c.Logger().Errorf("Error opening file: %s", err)
+		res := Response{Message: "Error opening file"}
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+	defer file.Close()
+
+	var itemsData Items
+	err = json.NewDecoder(file).Decode(&itemsData)
+	if err != nil {
+		c.Logger().Errorf("Error decoding file: %s", err)
+		res := Response{Message: "Error decoding file"}
+		return c.JSON(http.StatusInternalServerError, res)
+	}
+	//id-1が0未満ならエラー
+	indexID := id - 1
+	if indexID < 0 {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, itemsData.Items[indexID])
+}
+
 // ItemsからJSONに変換
 func writeItems(items *Items) error {
 	jsonItemData, err := os.Create(JSONFile)
@@ -57,7 +94,6 @@ func writeItems(items *Items) error {
 	}
 	defer jsonItemData.Close()
 	// Encode: ItemsからJSONに変換
-
 	encoder := json.NewEncoder(jsonItemData)
 	if err := encoder.Encode(items); err != nil {
 		return err
@@ -65,23 +101,50 @@ func writeItems(items *Items) error {
 	return nil
 }
 
-func addItem(c echo.Context) error {
-	// Get form data
-	name := c.FormValue("name")
-	category := c.FormValue("category")
-
-	if name == "" || category == "" {
-		return c.JSON(http.StatusBadRequest,
-			Response{Message: "Name or category cannot be empty"})
+// イメージファイルのハッシュを作成する
+func makeHashImage(c echo.Context, image string) (string, error) {
+	imageFile, err := c.FormFile("image")
+	if err != nil {
+		return "imageFileError", err
 	}
 
-	newItem := Item{Name: name, Category: category}
-	// for debug: Received item
-	fmt.Printf("Received item: %+v\n", newItem)
+	imageData, err := imageFile.Open()
+	if err != nil {
+		return "imageDataError", err
+	}
+	defer imageData.Close()
+	//ハッシュ値を生成
+	hash := sha256.New()
+	if _, err := io.Copy(hash, imageData); err != nil {
+		return "HashError", err
+	}
+	// バイトのスライスとして、最終的なハッシュ値を得る
+	bs := hash.Sum(nil)
+	fmt.Printf("%x\n", bs)
+	//import encoding/hex: 16 進エンコーディングして返す！
+	return hex.EncodeToString(bs), nil
+}
+
+// Handler
+func addItem(c echo.Context) error {
+	name := c.FormValue("name")
+	category := c.FormValue("category")
+	image, err := c.FormFile("image")
+	if err != nil {
+		return err
+	}
+
+	imageHash, err := makeHashImage(c, image.Filename)
+	if err != nil {
+		return err
+	}
+
+	newItem := Item{Name: name, Category: category, ImageName: imageHash + ".jpg"}
+
 	// Read existing items from JSON file
 	items, err := readItems()
 	if err != nil {
-		return err
+		c.Logger().Errorf("Error geting hash: %s", err)
 	}
 	// Append new item to items
 	items.Items = append(items.Items, newItem)
@@ -89,12 +152,13 @@ func addItem(c echo.Context) error {
 	if err := writeItems(items); err != nil {
 		return err
 	}
-	message := fmt.Sprintf("Item received: %s, category: %s", newItem.Name, newItem.Category)
+	message := fmt.Sprintf("Item received: %s, category: %s, image: %s", newItem.Name, newItem.Category, newItem.ImageName)
 	res := Response{Message: message}
 
 	return c.JSON(http.StatusOK, res)
 }
 
+// Handler
 func getItems(c echo.Context) error {
 	items, err := readItems()
 	if err != nil {
@@ -103,6 +167,7 @@ func getItems(c echo.Context) error {
 	return c.JSON(http.StatusOK, items)
 }
 
+// Handler
 func getImg(c echo.Context) error {
 	// Create image path
 	imgPath := path.Join(ImgDir, c.Param("imageFilename"))
@@ -119,12 +184,14 @@ func getImg(c echo.Context) error {
 }
 
 func main() {
+	//echoインスタンス生成
 	e := echo.New()
-
 	// Middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-	e.Logger.SetLevel(log.INFO)
+
+	// Start server
+	e.Logger.SetLevel(log.DEBUG)
 
 	frontURL := os.Getenv("FRONT_URL")
 	if frontURL == "" {
@@ -139,6 +206,7 @@ func main() {
 	e.GET("/", root)
 	e.POST("/items", addItem)
 	e.GET("/items", getItems)
+	e.GET("/items/:id", getItemById)
 	e.GET("/image/:imageFilename", getImg)
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
