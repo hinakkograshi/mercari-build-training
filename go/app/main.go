@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -62,7 +61,7 @@ func getItemById(c echo.Context) error {
 	if err != nil {
 		c.Logger().Errorf("Error geting item id: %s", err)
 	}
-	//ファイルを開くF
+	//ファイルを開く
 	file, err := os.Open(JSONFile)
 	if err != nil {
 		c.Logger().Errorf("Error opening file: %s", err)
@@ -106,19 +105,17 @@ func writeItems(items *Items) error {
 func makeHashImage(c echo.Context, image string) (string, error) {
 	imageFile, err := c.FormFile("image")
 	if err != nil {
-		//errors.Errorfエラー
-		return "", errors.Errorf("imageFileError: %v", err)
+		return "", fmt.Errorf("imageFileError")
 	}
-
 	imageData, err := imageFile.Open()
 	if err != nil {
-		return "imageDataError", err
+		return "", fmt.Errorf("imageDataError")
 	}
 	defer imageData.Close()
 	//ハッシュ値を生成
 	hash := sha256.New()
 	if _, err := io.Copy(hash, imageData); err != nil {
-		return "HashError", err
+		return "", fmt.Errorf("HashError")
 	}
 	// バイトのスライスとして、最終的なハッシュ値を得る
 	bs := hash.Sum(nil)
