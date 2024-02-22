@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,7 +26,7 @@ type Item struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Category  string `json:"category"`
-	ImageName string `json:"itemName"`
+	ImageName string `json:"image_name"`
 }
 
 const (
@@ -79,7 +80,7 @@ func getItemById(c echo.Context) error {
 	}
 	//id-1が0未満ならエラー
 	indexID := id - 1
-	if indexID < 0 {
+	if indexID < 0 || indexID > len(itemsData.Items)-1 {
 		return err
 	}
 
@@ -105,7 +106,7 @@ func writeItems(items *Items) error {
 func makeHashImage(c echo.Context, image string) (string, error) {
 	imageFile, err := c.FormFile("image")
 	if err != nil {
-		return "imageFileError", err
+		return "", errors.Errorf("imageFileError: %v", err)
 	}
 
 	imageData, err := imageFile.Open()
@@ -145,6 +146,7 @@ func addItem(c echo.Context) error {
 	items, err := readItems()
 	if err != nil {
 		c.Logger().Errorf("Error geting hash: %s", err)
+		return err
 	}
 	// Append new item to items
 	items.Items = append(items.Items, newItem)
