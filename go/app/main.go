@@ -106,6 +106,7 @@ func writeItems(items *Items) error {
 func makeHashImage(c echo.Context, image string) (string, error) {
 	imageFile, err := c.FormFile("image")
 	if err != nil {
+		//errors.Errorfエラー
 		return "", errors.Errorf("imageFileError: %v", err)
 	}
 
