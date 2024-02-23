@@ -1,11 +1,7 @@
 package main
 
 import (
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
-	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path"
@@ -139,60 +135,92 @@ func getItems(c echo.Context) error {
 // }
 
 // イメージファイルのハッシュを作成する
-func makeHashImage(c echo.Context, image string) (string, error) {
-	imageFile, err := c.FormFile("image")
-	if err != nil {
-		return "", fmt.Errorf("imageFileError: %w", err)
-	}
-	imageData, err := imageFile.Open()
-	if err != nil {
-		return "", fmt.Errorf("imageDataError: %w", err)
-	}
-	defer imageData.Close()
-	//ハッシュ値を生成
-	hash := sha256.New()
-	if _, err := io.Copy(hash, imageData); err != nil {
-		return "", fmt.Errorf("HashError: %w", err)
-	}
-	// バイトのスライスとして、最終的なハッシュ値を得る
-	bs := hash.Sum(nil)
-	fmt.Printf("%x\n", bs)
-	//import encoding/hex: 16 進エンコーディングして返す！
-	return hex.EncodeToString(bs), nil
-}
+// func makeHashImage(c echo.Context, image string) (string, error) {
+// 	imageFile, err := c.FormFile("image")
+// 	if err != nil {
+// 		return "", fmt.Errorf("imageFileError: %w", err)
+// 	}
+// 	imageData, err := imageFile.Open()
+// 	if err != nil {
+// 		return "", fmt.Errorf("imageDataError: %w", err)
+// 	}
+// 	defer imageData.Close()
+// 	//ハッシュ値を生成
+// 	hash := sha256.New()
+// 	if _, err := io.Copy(hash, imageData); err != nil {
+// 		return "", fmt.Errorf("HashError: %w", err)
+// 	}
+// 	// バイトのスライスとして、最終的なハッシュ値を得る
+// 	bs := hash.Sum(nil)
+// 	fmt.Printf("%x\n", bs)
+// 	//import encoding/hex: 16 進エンコーディングして返す！
+// 	return hex.EncodeToString(bs), nil
+// }
 
 // Handler
 func addItem(c echo.Context) error {
 	name := c.FormValue("name")
-	// category := c.FormValue("category")
-	// image, err := c.FormFile("image")
-	// if err != nil {
-	// 	return err
-	// }
+	category := c.FormValue("category")
+	image, err := c.FormFile("image")
+	if err != nil {
+		return err
+	}
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		c.Logger().Errorf("Error opening file: %s", err)
+		res := Response{Message: "Error opening file"}
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
+	}
+	defer db.Close()
 
-	// imageHash, err := makeHashImage(c, image.Filename)
-	// if err != nil {
-	// 	return err
-	// }
+	// 全てのitemを挿入
+	stmt, err := db.Prepare("INSERT INTO items (name, category, image_name) VALUES ($1, $2, $3)")
+	if err != nil {
+		c.Logger().Errorf("Error INSERT INTO items: %s", err)
+		res := Response{Message: "Error INSERT INTO items"}
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
+	}
+	defer stmt.Close()
+	if _, err = stmt.Exec(name, category, image); err != nil {
+		c.Logger().Errorf("Error opening file: %s", err)
+		res := Response{Message: "Error opening file"}
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
+	}
+	res := Response{Message: "追加に成功しました。"}
+	return c.JSON(http.StatusOK, res)
+}
 
-	// get a connection to the SQLite3 database
+func searchItem(c echo.Context) error {
+
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	defer db.Close()
 
-	// invoke SQL to collect all of items
-	stmt, err := db.Prepare("INSERT INTO items (name, category, image_name) VALUES ($1, $2, $3)")
+	keyword := c.QueryParam("keyword")
+	rows, err := db.Query("SELECT name, category, image_name FROM items WHERE name LIKE ?", "%"+keyword+"%")
 	if err != nil {
-		return err
+		c.Logger().Errorf("Error SELECT item: %s", err)
+		res := Response{Message: "Error SELECT item"}
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
-	defer stmt.Close()
-	if _, err = stmt.Exec(name, "unknown", "default.jpg"); err != nil {
-		return err
+	defer rows.Close()
+
+	items := new(Items)
+	for rows.Next() {
+		var itemData Item
+
+		err := rows.Scan(&itemData.Name, &itemData.Category, &itemData.ImageName)
+		if err != nil {
+			c.Logger().Errorf("Error Scan: %s", err)
+			res := Response{Message: "Error Scan itemData"}
+			return echo.NewHTTPError(http.StatusInternalServerError, res)
+		}
+		items.Items = append(items.Items, itemData)
 	}
-	res := Response{Message: "追加に成功しました。"}
-	return c.JSON(http.StatusOK, res)
+	//json形式に変換
+	return c.JSON(http.StatusOK, items)
 }
 
 // func addItem(c echo.Context) error {
@@ -276,8 +304,9 @@ func main() {
 	e.GET("/", root)
 	e.POST("/items", addItem)
 	e.GET("/items", getItems)
-	// e.GET("/items/:id", getItems)
+	// e.GET("/items/:id", getByItems)
 	e.GET("/image/:imageFilename", getImg)
+	e.GET("/search", searchItem)
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
 }
