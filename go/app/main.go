@@ -105,17 +105,17 @@ func writeItems(items *Items) error {
 func makeHashImage(c echo.Context, image string) (string, error) {
 	imageFile, err := c.FormFile("image")
 	if err != nil {
-		return "", fmt.Errorf("imageFileError")
+		return "", fmt.Errorf("imageFileError: %w", err)
 	}
 	imageData, err := imageFile.Open()
 	if err != nil {
-		return "", fmt.Errorf("imageDataError")
+		return "", fmt.Errorf("imageDataError: %w", err)
 	}
 	defer imageData.Close()
 	//ハッシュ値を生成
 	hash := sha256.New()
 	if _, err := io.Copy(hash, imageData); err != nil {
-		return "", fmt.Errorf("HashError")
+		return "", fmt.Errorf("HashError: %w", err)
 	}
 	// バイトのスライスとして、最終的なハッシュ値を得る
 	bs := hash.Sum(nil)
