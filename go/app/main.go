@@ -54,7 +54,7 @@ func getItems(c echo.Context) error {
 	}
 	defer db.Close()
 	//🟥
-	cmd := "SELECT items.name, category.name as category, items.image_name FROM items join category on items.category_id = category.id;"
+	cmd := "SELECT items.name, categories.name as categories, items.image_name FROM items join categories on items.category_id = categories.id;"
 	rows, err := db.Query(cmd)
 	if err != nil {
 		c.Logger().Errorf("Error getItems Query: %s", err)
@@ -97,7 +97,7 @@ func getItemById(c echo.Context) error {
 	}
 	var item Item
 
-	query := "SELECT items.name, category.name as category, items.image_name FROM items join category on items.category_id = category.id WHERE items.id = ?"
+	query := "SELECT items.name, categories.name as categories, items.image_name FROM items join categories on items.category_id = categories.id WHERE items.id = ?"
 	row := db.QueryRow(query, itemID)
 	err = row.Scan(&item.Name, &item.Category, &item.ImageName)
 	if err != nil {
@@ -217,17 +217,18 @@ func addItem(c echo.Context) error {
 	// カテゴリが存在するか調べる
 	var categoryID int64
 
-	err = db.QueryRow("SELECT id FROM category WHERE name = ?", category).Scan(&categoryID)
+	err = db.QueryRow("SELECT id FROM categories WHERE name = ?", category).Scan(&categoryID)
 	// カテゴリが存在しない場合、新しいカテゴリを追加
 	if err == sql.ErrNoRows {
-		result, err := db.Exec("INSERT INTO category (name) VALUES (?)", category)
+		result, err := db.Exec("INSERT INTO categories (name) VALUES (?)", category)
 		if err != nil {
-			res := Response{Message: "Error adding new category to the database"}
+			res := Response{Message: "Error adding new categories to the database"}
 			return c.JSON(http.StatusInternalServerError, res)
 		}
 		categoryID, _ = result.LastInsertId()
 	} else if err != nil {
-		res := Response{Message: "Error querying category from the database"}
+		c.Logger().Errorf("Error INSERT INTO items: %s", err)
+		res := Response{Message: "Error querying categories from the database"}
 		return c.JSON(http.StatusInternalServerError, res)
 	}
 	// dbに保存
@@ -244,7 +245,7 @@ func addItem(c echo.Context) error {
 		res := Response{Message: "Error opening file"}
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
-	message := fmt.Sprintf("item received: name=%s,category=%s,images=%s", name, category, imageName)
+	message := fmt.Sprintf("item received: name=%s,categories=%s,images=%s", name, category, imageName)
 	res := Response{Message: message}
 	return c.JSON(http.StatusOK, res)
 }
@@ -258,7 +259,7 @@ func searchItem(c echo.Context) error {
 	defer db.Close()
 
 	keyword := c.QueryParam("keyword")
-	rows, err := db.Query("SELECT name, category, image_name FROM items WHERE name LIKE ?", "%"+keyword+"%")
+	rows, err := db.Query("SELECT name, categor, image_name FROM items WHERE name LIKE ?", "%"+keyword+"%")
 	if err != nil {
 		c.Logger().Errorf("Error SELECT item: %s", err)
 		res := Response{Message: "Error SELECT item"}
