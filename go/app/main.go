@@ -43,41 +43,42 @@ func root(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
-// func getItems(c echo.Context) error {
-// 	//ファイルを開く
-// 	db, err := sql.Open("sqlite3", dbPath)
-// 	if err != nil {
-// 		c.Logger().Errorf("Error opening file: %s", err)
-// 		res := Response{Message: "Error opening file"}
-// 		return echo.NewHTTPError(http.StatusInternalServerError, res)
-// 	}
-// 	defer db.Close()
-// 	cmd := "SELECT items.name, categories.name as categories, items.image_name FROM items join categories on items.category_id = categories.id;"
-// 	rows, err := db.Query(cmd)
-// 	if err != nil {
-// 		c.Logger().Errorf("Error getItems Query: %s", err)
-// 		res := Response{Message: "Error getItems Query"}
-// 		return echo.NewHTTPError(http.StatusInternalServerError, res)
-// 	}
-// 	defer rows.Close()
-// 🟥
-// items := new(Items)
+func getItems(c echo.Context) error {
+	//ファイルを開く
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		c.Logger().Errorf("Error opening file: %s", err)
+		res := Response{Message: "Error opening file"}
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
+	}
+	defer db.Close()
+	query := "SELECT items.name, items.category_id, items.image_name FROM items join categories ON items.category_id = categories.id"
+	rows, err := db.Query(query)
+	if err != nil {
+		c.Logger().Errorf("Error getItems Query: %s", err)
+		res := Response{Message: "Error getItems Query"}
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
+	}
+	defer rows.Close()
 
-// for rows.Next() {
-// 	var itemData Item
+	items := new(Items)
 
-// 	err := rows.Scan(&itemData.ID, &itemData.Category, &itemData.ImageName)
-// 	if err != nil {
-// 		c.Logger().Errorf("Error Scan: %s", err)
-// 		res := Response{Message: "Error Scan itemData"}
-// 		return echo.NewHTTPError(http.StatusInternalServerError, res)
-// 	}
-// 	items.Items = append(items.Items, itemData)
-// }
-// json形式に変換
-// 	return c.JSON(http.StatusOK, items)
-// }
+	for rows.Next() {
+		var itemData Item
 
+		err := rows.Scan(&itemData.Name, &itemData.Category, &itemData.ImageName)
+		if err != nil {
+			c.Logger().Errorf("Error Scan: %s", err)
+			res := Response{Message: "Error Scan itemData"}
+			return echo.NewHTTPError(http.StatusInternalServerError, res)
+		}
+		items.Items = append(items.Items, itemData)
+	}
+	//json形式に変換
+	return c.JSON(http.StatusOK, items)
+}
+
+// 🟩OK
 func getItemById(c echo.Context) error {
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
@@ -94,7 +95,6 @@ func getItemById(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, res)
 	}
 	var item Item
-
 	query := "SELECT items.name, categories.name as categories, items.image_name FROM items join categories on items.category_id = categories.id WHERE items.id = ?"
 	row := db.QueryRow(query, itemID)
 	err = row.Scan(&item.Name, &item.Category, &item.ImageName)
@@ -129,6 +129,7 @@ func makeHashImage(c echo.Context, image string) (string, error) {
 	return hex.EncodeToString(bs), nil
 }
 
+// 🟩OK
 func addItem(c echo.Context) error {
 	// var items Items
 	// var categoryID int
@@ -153,7 +154,6 @@ func addItem(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 	defer db.Close()
-
 	// カテゴリが存在するか調べる
 	var categoryID int64
 	row := db.QueryRow("SELECT id FROM categories WHERE name = ?", category)
@@ -191,35 +191,31 @@ func addItem(c echo.Context) error {
 }
 
 func searchItem(c echo.Context) error {
-	keyword := c.FormValue("keyword")
-
+	var items Items
+	keyword := c.QueryParam("keyword")
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		c.Logger().Errorf("Error opening file: %s", err)
+		res := Response{Message: "Error opening file"}
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 	defer db.Close()
 
-	rows, err := db.Query("SELECT name, category, image_name FROM items WHERE name LIKE ?", "%"+keyword+"%")
+	query := "SELECT items.name, categories.name, items.image_name FROM items JOIN categories ON items.category_id = categories.id WHERE items.name LIKE ?"
+	rows, err := db.Query(query, "%"+keyword+"%")
 	if err != nil {
-		c.Logger().Errorf("Error SELECT item: %s", err)
-		res := Response{Message: "Error SELECT item"}
+		c.Logger().Errorf("Error Query: %s", err)
+		res := Response{Message: "Error Query"}
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 	defer rows.Close()
-
-	items := new(Items)
 	for rows.Next() {
-		var itemData Item
-
-		err := rows.Scan(&itemData.Name, &itemData.Category, &itemData.ImageName)
-		if err != nil {
-			c.Logger().Errorf("Error Scan: %s", err)
-			res := Response{Message: "Error Scan itemData"}
-			return echo.NewHTTPError(http.StatusInternalServerError, res)
+		var item Item
+		if err := rows.Scan(&item.Name, &item.Category, &item.ImageName); err != nil {
+			return err
 		}
-		items.Items = append(items.Items, itemData)
+		items.Items = append(items.Items, item)
 	}
-	//json形式に変換
 	return c.JSON(http.StatusOK, items)
 }
 
@@ -261,7 +257,7 @@ func main() {
 	// Routes
 	e.GET("/", root)
 	e.POST("/items", addItem)
-	// e.GET("/items", getItems)
+	e.GET("/items", getItems)
 	e.GET("/items/:id", getItemById)
 	e.GET("/image/:imageFilename", getImg)
 	e.GET("/search", searchItem)
