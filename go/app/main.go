@@ -44,7 +44,7 @@ func root(c echo.Context) error {
 }
 
 func getItems(c echo.Context) error {
-	//ファイルを開く
+	//dbに接続
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		c.Logger().Errorf("Error opening file: %s", err)
@@ -62,13 +62,11 @@ func getItems(c echo.Context) error {
 	defer rows.Close()
 
 	items := new(Items)
-
 	for rows.Next() {
 		var itemData Item
-
 		err := rows.Scan(&itemData.Name, &itemData.Category, &itemData.ImageName)
 		if err != nil {
-			c.Logger().Errorf("Error Scan: %s", err)
+			c.Logger().Errorf("Error Scan itemData: %s", err)
 			res := Response{Message: "Error Scan itemData"}
 			return echo.NewHTTPError(http.StatusInternalServerError, res)
 		}
@@ -78,7 +76,6 @@ func getItems(c echo.Context) error {
 	return c.JSON(http.StatusOK, items)
 }
 
-// 🟩OK
 func getItemById(c echo.Context) error {
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
@@ -92,7 +89,7 @@ func getItemById(c echo.Context) error {
 	itemID, err := strconv.Atoi(id)
 	if err != nil {
 		res := Response{Message: "Error geting itemID"}
-		return c.JSON(http.StatusInternalServerError, res)
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 	var item Item
 	query := "SELECT items.name, categories.name as categories, items.image_name FROM items join categories on items.category_id = categories.id WHERE items.id = ?"
@@ -129,20 +126,19 @@ func makeHashImage(c echo.Context, image string) (string, error) {
 	return hex.EncodeToString(bs), nil
 }
 
-// 🟩OK
 func addItem(c echo.Context) error {
-	// var items Items
-	// var categoryID int
 	name := c.FormValue("name")
 	category := c.FormValue("category")
 	image, err := c.FormFile("image")
 	if err != nil {
-		return err
+		res := Response{Message: "Return image FormFile"}
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 
 	imageHash, err := makeHashImage(c, image.Filename)
 	if err != nil {
-		return err
+		res := Response{Message: "Return imageHash"}
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 	imageName := imageHash + ".jpg"
 
@@ -163,13 +159,13 @@ func addItem(c echo.Context) error {
 		result, err := db.Exec("INSERT INTO categories (name) VALUES (?)", category)
 		if err != nil {
 			res := Response{Message: "Error adding new categories to the database"}
-			return c.JSON(http.StatusInternalServerError, res)
+			return echo.NewHTTPError(http.StatusInternalServerError, res)
 		}
 		categoryID, _ = result.LastInsertId()
 	} else if err != nil {
 		c.Logger().Errorf("Error INSERT INTO items: %s", err)
 		res := Response{Message: "Error querying categories from the database"}
-		return c.JSON(http.StatusInternalServerError, res)
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 	// dbに保存
 	stmt, err := db.Prepare("INSERT INTO items (name, category_id, image_name) VALUES (?, ?, ?)")
@@ -212,7 +208,8 @@ func searchItem(c echo.Context) error {
 	for rows.Next() {
 		var item Item
 		if err := rows.Scan(&item.Name, &item.Category, &item.ImageName); err != nil {
-			return err
+			res := Response{Message: "Error Scan earchItem"}
+			return echo.NewHTTPError(http.StatusInternalServerError, res)
 		}
 		items.Items = append(items.Items, item)
 	}
@@ -221,12 +218,11 @@ func searchItem(c echo.Context) error {
 
 // Handler
 func getImg(c echo.Context) error {
-	// Create image path
 	imgPath := path.Join(ImgDir, c.Param("imageFilename"))
 
 	if !strings.HasSuffix(imgPath, ".jpg") {
 		res := Response{Message: "Error image path"}
-		return c.JSON(http.StatusBadRequest, res)
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 	if _, err := os.Stat(imgPath); err != nil {
 		c.Logger().Debugf("Image not found: %s", imgPath)
@@ -241,7 +237,6 @@ func main() {
 	// Middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-
 	// Start server
 	e.Logger.SetLevel(log.DEBUG)
 
