@@ -31,7 +31,7 @@ type Item struct {
 const (
 	ImgDir   = "images"
 	JSONFile = "items.json"
-	dbPath   = "../db/mercari.sqlite3"
+	dbPath   = "./db/mercari.sqlite3"
 )
 
 type Response struct {
