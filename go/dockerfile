@@ -7,8 +7,7 @@ WORKDIR /app
 COPY . /app/
 RUN ls
 RUN pwd
-RUN mv go/ db /db && chown -R trainee:mercari /db
+RUN mv go/db /db && chown -R trainee:mercari /db
 
 RUN go mod tidy
 CMD go run app/main.go
-
