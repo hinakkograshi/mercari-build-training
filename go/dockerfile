@@ -1,5 +1,4 @@
 FROM golang:1.21-alpine
-
 RUN addgroup -S mercari && adduser -S trainee -G mercari
 # RUN chown -R trainee:mercari /path/to/db
 
@@ -10,3 +9,4 @@ RUN mv db /db && chown -R trainee:mercari /db
 
 RUN go mod tidy
 CMD go run app/main.go
+
