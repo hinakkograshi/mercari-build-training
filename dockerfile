@@ -6,9 +6,6 @@ WORKDIR /app/
 #mercari.bild Mac何を環境dockerパスapp/db,app,images
 COPY ./go /app/
 
-
-RUN ls
-RUN pwd
 RUN mv db /db && chown -R trainee:mercari /db
 
 RUN go mod tidy
