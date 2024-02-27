@@ -19,9 +19,10 @@ import (
 )
 
 type Items struct {
-	Items []Item `json:"item"`
+	Items []Item `json:"items"`
 }
 
+// IDを追加
 type Item struct {
 	Name      string `json:"name"`
 	Category  string `json:"category"`
@@ -31,7 +32,7 @@ type Item struct {
 const (
 	ImgDir   = "images"
 	JSONFile = "items.json"
-	dbPath   = "db/mercari.sqlite3"
+	dbPath   = "./db/mercari.sqlite3"
 )
 
 type Response struct {
