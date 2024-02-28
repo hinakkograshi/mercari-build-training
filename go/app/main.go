@@ -24,6 +24,7 @@ type Items struct {
 
 // IDを追加
 type Item struct {
+	ID        int    `json:"id"`
 	Name      string `json:"name"`
 	Category  string `json:"category"`
 	ImageName string `json:"image_name"`
@@ -53,7 +54,11 @@ func getItems(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 	defer db.Close()
-	query := "SELECT items.name, items.category_id, items.image_name FROM items join categories ON items.category_id = categories.id"
+	query := `
+	SELECT items.id, items.name, categories.name, items.image_name
+	FROM items
+	JOIN categories ON items.category_id = categories.id
+`
 	rows, err := db.Query(query)
 	if err != nil {
 		c.Logger().Errorf("Error getItems Query: %s", err)
@@ -64,14 +69,14 @@ func getItems(c echo.Context) error {
 
 	items := new(Items)
 	for rows.Next() {
-		var itemData Item
-		err := rows.Scan(&itemData.Name, &itemData.Category, &itemData.ImageName)
+		var item Item
+		err := rows.Scan(&item.ID, &item.Name, &item.Category, &item.ImageName)
 		if err != nil {
 			c.Logger().Errorf("Error Scan itemData: %s", err)
 			res := Response{Message: "Error Scan itemData"}
 			return echo.NewHTTPError(http.StatusInternalServerError, res)
 		}
-		items.Items = append(items.Items, itemData)
+		items.Items = append(items.Items, item)
 	}
 	//json形式に変換
 	return c.JSON(http.StatusOK, items)
