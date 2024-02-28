@@ -3,35 +3,35 @@
 }
 
 .Title {
-  background-color: #222427;
+  background-color: #6B240C;
   min-height: 8vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: left;
-  font-size: calc(10px + 1vmin);
+  font-size: calc(20px + 1vmin);
   color: white;
 }
 
 .Listing {
-  background-color: #222427;
+  background-color: #FFB534;
   min-height: 8vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: left;
-  font-size: calc(10px + 1vmin);
+  font-size: calc(15px + 1vmin);
   color: white;
 }
 
 .ItemList {
-  background-color: #222427;
+  background-color: #FFB534;
   min-height: 8vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: left;
-  font-size: calc(10px + 1vmin);
+  font-size: calc(15x + 1vmin);
   color: white;
 }
 
