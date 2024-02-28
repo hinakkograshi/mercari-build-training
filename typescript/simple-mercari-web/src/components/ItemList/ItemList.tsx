@@ -46,12 +46,13 @@ export const ItemList: React.FC<Prop> = (props) => {
   }, [reload]);
 
   return (
-    <div>
+    <div className='wrapper'>
       {items.map((item) => {
         return (
           <div key={item.id} className='ItemList'>
             {/* TODO: Task 1: Replace the placeholder image with the item image */}
-            <img src={`${server}/image/${item.id}.jpg`} alt={`Item ${item.id}`} />
+            <img src={`${server}/image/${item.id}.jpg`} alt={`Item ${item.id}`} width={200} height={200}/>
+
             <p>
               <span>Name: {item.name}</span>
               <br />

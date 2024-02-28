@@ -31,8 +31,17 @@
   flex-direction: column;
   align-items: center;
   justify-content: left;
-  font-size: calc(15x + 1vmin);
+  font-size: calc(13px + 1vmin);
   color: white;
+  font-weight: bold;
+}
+
+.wrapper {
+  background-color: #FFB534;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-auto-rows: minmax(100px, auto);
+  /* grid-auto-rows: 400px; */
 }
 
 .App-link {
