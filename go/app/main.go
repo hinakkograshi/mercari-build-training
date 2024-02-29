@@ -98,9 +98,9 @@ func getItemById(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 	var item Item
-	query := "SELECT items.name, categories.name as categories, items.image_name FROM items join categories on items.category_id = categories.id WHERE items.id = ?"
+	query := "SELECT items.id, items.name, categories.name as categories, items.image_name FROM items join categories on items.category_id = categories.id WHERE items.id = ?"
 	row := db.QueryRow(query, itemID)
-	err = row.Scan(&item.Name, &item.Category, &item.ImageName)
+	err = row.Scan(&item.ID, &item.Name, &item.Category, &item.ImageName)
 	if err != nil {
 		c.Logger().Errorf("Error Query: %s", err)
 		res := Response{Message: "Error Query"}
@@ -241,7 +241,7 @@ func getImg(c echo.Context) error {
 	fmt.Println("imageFilename!!!!!!!!:%v:", imageFilename)
 	imgPath := path.Join(ImgDir, imageFilename)
 
-	// 拡張子がjpgがチェック
+	//拡張子がjpgがチェック
 	if !strings.HasSuffix(imgPath, ".jpg") {
 		c.Logger().Errorf("Image path does not end with .jpg:%s", imgPath)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Image path does not end with .jpg")
@@ -251,16 +251,23 @@ func getImg(c echo.Context) error {
 	imageID := strings.TrimSuffix(imageFilename, ".jpg")
 	var imgPathById string
 	row := db.QueryRow("SELECT image_name FROM items WHERE id = ?", imageID)
+
 	err = row.Scan(&imgPathById)
 	if err != nil {
 		c.Logger().Errorf("Error Scan item: %s", err)
 		res := Response{Message: "Error Scan item"}
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
+	fmt.Println("row!!!!!!!!:%v:", row)
+	fmt.Println("imgPathById!!!!!!!!:%v:", imgPathById)
+	fmt.Println("imgPath!!!!!!!!:%v:", imgPath)
+	imgPath = path.Join(ImgDir, imgPathById)
 
 	// ファイルが存在しないときはdefault.jpgを表示
 	if _, err := os.Stat(imgPath); err != nil {
+		fmt.Println("imgPath?????????!!!!!!!!:%v:", imgPath)
 		c.Logger().Errorf("Image not found: %s", err)
+		fmt.Print("Image not found: %s", err)
 		imgPath = path.Join(ImgDir, "default.jpg")
 	}
 	return c.File(imgPath)
