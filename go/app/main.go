@@ -238,11 +238,12 @@ func getImg(c echo.Context) error {
 	defer db.Close()
 	// id+.jpg
 	imageFilename := c.Param("imageFilename")
+	fmt.Println("imageFilename!!!!!!!!:%v:", imageFilename)
 	imgPath := path.Join(ImgDir, imageFilename)
 
 	// 拡張子がjpgがチェック
 	if !strings.HasSuffix(imgPath, ".jpg") {
-		c.Logger().Error("Image path does not end with .jpg")
+		c.Logger().Errorf("Image path does not end with .jpg:%s", imgPath)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Image path does not end with .jpg")
 	}
 
@@ -259,7 +260,7 @@ func getImg(c echo.Context) error {
 
 	// ファイルが存在しないときはdefault.jpgを表示
 	if _, err := os.Stat(imgPath); err != nil {
-		c.Logger().Errorf("Image not found: %s", imgPath)
+		c.Logger().Errorf("Image not found: %s", err)
 		imgPath = path.Join(ImgDir, "default.jpg")
 	}
 	return c.File(imgPath)
