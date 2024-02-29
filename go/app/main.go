@@ -238,17 +238,18 @@ func getImg(c echo.Context) error {
 	defer db.Close()
 	// id+.jpg
 	imageFilename := c.Param("imageFilename")
-	fmt.Println("imageFilename!!!!!!!!:%v:", imageFilename)
-	imgPath := path.Join(ImgDir, imageFilename)
+	imageJpg := imageFilename + ".jpg"
+	fmt.Println("imageFilename!!!!!!!!:%v:", imageJpg)
+
+	imgPath := path.Join(ImgDir, imageJpg)
 
 	//拡張子がjpgがチェック
 	if !strings.HasSuffix(imgPath, ".jpg") {
 		c.Logger().Errorf("Image path does not end with .jpg:%s", imgPath)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Image path does not end with .jpg")
 	}
-
 	// .jpgを取り除く
-	imageID := strings.TrimSuffix(imageFilename, ".jpg")
+	imageID := strings.TrimSuffix(imageJpg, ".jpg")
 	var imgPathById string
 	row := db.QueryRow("SELECT image_name FROM items WHERE id = ?", imageID)
 
@@ -261,7 +262,10 @@ func getImg(c echo.Context) error {
 	fmt.Println("row!!!!!!!!:%v:", row)
 	fmt.Println("imgPathById!!!!!!!!:%v:", imgPathById)
 	fmt.Println("imgPath!!!!!!!!:%v:", imgPath)
+
 	imgPath = path.Join(ImgDir, imgPathById)
+
+	fmt.Println("imgPath!??????!!:%v:", imgPath)
 
 	// ファイルが存在しないときはdefault.jpgを表示
 	if _, err := os.Stat(imgPath); err != nil {
@@ -270,6 +274,7 @@ func getImg(c echo.Context) error {
 		fmt.Print("Image not found: %s", err)
 		imgPath = path.Join(ImgDir, "default.jpg")
 	}
+	fmt.Println("imgPath#########:%v:", imgPath)
 	return c.File(imgPath)
 }
 
