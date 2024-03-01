@@ -3,9 +3,9 @@ package main
 import (
 	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path"
@@ -19,10 +19,12 @@ import (
 )
 
 type Items struct {
-	Items []Item `json:"item"`
+	Items []Item `json:"items"`
 }
 
+// IDを追加
 type Item struct {
+	ID        int    `json:"id"`
 	Name      string `json:"name"`
 	Category  string `json:"category"`
 	ImageName string `json:"image_name"`
@@ -31,7 +33,7 @@ type Item struct {
 const (
 	ImgDir   = "images"
 	JSONFile = "items.json"
-	dbPath   = "db/mercari.sqlite3"
+	dbPath   = "./db/mercari.sqlite3"
 )
 
 type Response struct {
@@ -52,7 +54,11 @@ func getItems(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 	defer db.Close()
-	query := "SELECT items.name, items.category_id, items.image_name FROM items join categories ON items.category_id = categories.id"
+	query := `
+	SELECT items.id, items.name, categories.name, items.image_name
+	FROM items
+	JOIN categories ON items.category_id = categories.id
+`
 	rows, err := db.Query(query)
 	if err != nil {
 		c.Logger().Errorf("Error getItems Query: %s", err)
@@ -63,14 +69,14 @@ func getItems(c echo.Context) error {
 
 	items := new(Items)
 	for rows.Next() {
-		var itemData Item
-		err := rows.Scan(&itemData.Name, &itemData.Category, &itemData.ImageName)
+		var item Item
+		err := rows.Scan(&item.ID, &item.Name, &item.Category, &item.ImageName)
 		if err != nil {
-			c.Logger().Errorf("Error Scan itemData: %s", err)
-			res := Response{Message: "Error Scan itemData"}
+			c.Logger().Errorf("Error Scan item: %s", err)
+			res := Response{Message: "Error Scan item"}
 			return echo.NewHTTPError(http.StatusInternalServerError, res)
 		}
-		items.Items = append(items.Items, itemData)
+		items.Items = append(items.Items, item)
 	}
 	//json形式に変換
 	return c.JSON(http.StatusOK, items)
@@ -92,9 +98,9 @@ func getItemById(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 	var item Item
-	query := "SELECT items.name, categories.name as categories, items.image_name FROM items join categories on items.category_id = categories.id WHERE items.id = ?"
+	query := "SELECT items.id, items.name, categories.name as categories, items.image_name FROM items join categories on items.category_id = categories.id WHERE items.id = ?"
 	row := db.QueryRow(query, itemID)
-	err = row.Scan(&item.Name, &item.Category, &item.ImageName)
+	err = row.Scan(&item.ID, &item.Name, &item.Category, &item.ImageName)
 	if err != nil {
 		c.Logger().Errorf("Error Query: %s", err)
 		res := Response{Message: "Error Query"}
@@ -103,27 +109,34 @@ func getItemById(c echo.Context) error {
 	return c.JSON(http.StatusOK, item)
 }
 
-// イメージファイルのハッシュを作成する
-func makeHashImage(c echo.Context, image string) (string, error) {
-	imageFile, err := c.FormFile("image")
+// イメージファイルのハッシュ化
+func saveImage(file *multipart.FileHeader) (string, error) {
+
+	src, err := file.Open()
 	if err != nil {
-		return "", fmt.Errorf("imageFileError: %w", err)
+		return "", err
 	}
-	imageData, err := imageFile.Open()
-	if err != nil {
-		return "", fmt.Errorf("imageDataError: %w", err)
-	}
-	defer imageData.Close()
-	//ハッシュ値を生成
+	defer src.Close()
+	// ハッシュ計算
 	hash := sha256.New()
-	if _, err := io.Copy(hash, imageData); err != nil {
-		return "", fmt.Errorf("HashError: %w", err)
+	if _, err := io.Copy(hash, src); err != nil {
+		return "", err
 	}
-	// バイトのスライスとして、最終的なハッシュ値を得る
-	bs := hash.Sum(nil)
-	fmt.Printf("%x\n", bs)
-	//import encoding/hex: 16 進エンコーディングして返す！
-	return hex.EncodeToString(bs), nil
+	// ハッシュを16進数文字列に変換
+	hashString := hash.Sum(nil)
+	// 行先ファイルを作成
+	hashedImageName := fmt.Sprintf("%x.jpg", hashString)
+	dst, err := os.Create(path.Join(ImgDir, hashedImageName))
+	if err != nil {
+		return "", err
+	}
+	defer dst.Close()
+	// 行先ファイルに保存
+	src.Seek(0, 0)
+	if _, err := io.Copy(dst, src); err != nil {
+		return "", err
+	}
+	return hashedImageName, nil
 }
 
 func addItem(c echo.Context) error {
@@ -135,13 +148,11 @@ func addItem(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 
-	imageHash, err := makeHashImage(c, image.Filename)
+	imageName, err := saveImage(image)
 	if err != nil {
 		res := Response{Message: "Return imageHash"}
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
-	imageName := imageHash + ".jpg"
-
 	//db接続
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
@@ -218,16 +229,52 @@ func searchItem(c echo.Context) error {
 
 // Handler
 func getImg(c echo.Context) error {
-	imgPath := path.Join(ImgDir, c.Param("imageFilename"))
-
-	if !strings.HasSuffix(imgPath, ".jpg") {
-		res := Response{Message: "Error image path"}
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		c.Logger().Errorf("Error opening file: %s", err)
+		res := Response{Message: "Error opening file"}
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
+	defer db.Close()
+	// id+.jpg
+	imageFilename := c.Param("imageFilename")
+	imageJpg := imageFilename + ".jpg"
+	fmt.Println("imageFilename!!!!!!!!:%v:", imageJpg)
+
+	imgPath := path.Join(ImgDir, imageJpg)
+
+	//拡張子がjpgがチェック
+	if !strings.HasSuffix(imgPath, ".jpg") {
+		c.Logger().Errorf("Image path does not end with .jpg:%s", imgPath)
+		return echo.NewHTTPError(http.StatusInternalServerError, "Image path does not end with .jpg")
+	}
+	// .jpgを取り除く
+	imageID := strings.TrimSuffix(imageJpg, ".jpg")
+	var imgPathById string
+	row := db.QueryRow("SELECT image_name FROM items WHERE id = ?", imageID)
+
+	err = row.Scan(&imgPathById)
+	if err != nil {
+		c.Logger().Errorf("Error Scan item: %s", err)
+		res := Response{Message: "Error Scan item"}
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
+	}
+	fmt.Println("row!!!!!!!!:%v:", row)
+	fmt.Println("imgPathById!!!!!!!!:%v:", imgPathById)
+	fmt.Println("imgPath!!!!!!!!:%v:", imgPath)
+
+	imgPath = path.Join(ImgDir, imgPathById)
+
+	fmt.Println("imgPath!??????!!:%v:", imgPath)
+
+	// ファイルが存在しないときはdefault.jpgを表示
 	if _, err := os.Stat(imgPath); err != nil {
-		c.Logger().Debugf("Image not found: %s", imgPath)
+		fmt.Println("imgPath?????????!!!!!!!!:%v:", imgPath)
+		c.Logger().Errorf("Image not found: %s", err)
+		fmt.Print("Image not found: %s", err)
 		imgPath = path.Join(ImgDir, "default.jpg")
 	}
+	fmt.Println("imgPath#########:%v:", imgPath)
 	return c.File(imgPath)
 }
 
