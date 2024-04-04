@@ -239,8 +239,6 @@ func getImg(c echo.Context) error {
 	// id+.jpg
 	imageFilename := c.Param("imageFilename")
 	imageJpg := imageFilename + ".jpg"
-	fmt.Println("imageFilename!!!!!!!!:%v:", imageJpg)
-
 	imgPath := path.Join(ImgDir, imageJpg)
 
 	//拡張子がjpgがチェック
@@ -259,22 +257,12 @@ func getImg(c echo.Context) error {
 		res := Response{Message: "Error Scan item"}
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
-	fmt.Println("row!!!!!!!!:%v:", row)
-	fmt.Println("imgPathById!!!!!!!!:%v:", imgPathById)
-	fmt.Println("imgPath!!!!!!!!:%v:", imgPath)
-
 	imgPath = path.Join(ImgDir, imgPathById)
-
-	fmt.Println("imgPath!??????!!:%v:", imgPath)
-
 	// ファイルが存在しないときはdefault.jpgを表示
 	if _, err := os.Stat(imgPath); err != nil {
-		fmt.Println("imgPath?????????!!!!!!!!:%v:", imgPath)
 		c.Logger().Errorf("Image not found: %s", err)
-		fmt.Print("Image not found: %s", err)
 		imgPath = path.Join(ImgDir, "default.jpg")
 	}
-	fmt.Println("imgPath#########:%v:", imgPath)
 	return c.File(imgPath)
 }
 
