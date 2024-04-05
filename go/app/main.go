@@ -31,9 +31,10 @@ type Item struct {
 }
 
 const (
-	ImgDir   = "images"
+	ImgDir   = "../images"
 	JSONFile = "items.json"
-	dbPath   = "./db/mercari.sqlite3"
+	// Macの相対パス
+	dbPath = "../db/mercari.sqlite3"
 )
 
 type Response struct {
@@ -54,11 +55,12 @@ func getItems(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 	defer db.Close()
+
 	query := `
-	SELECT items.id, items.name, categories.name, items.image_name
-	FROM items
-	JOIN categories ON items.category_id = categories.id
-`
+		SELECT items.id, items.name, categories.name, items.image_name
+		FROM items
+		JOIN categories ON items.category_id = categories.id
+	`
 	rows, err := db.Query(query)
 	if err != nil {
 		c.Logger().Errorf("Error getItems Query: %s", err)
@@ -178,7 +180,6 @@ func addItem(c echo.Context) error {
 		res := Response{Message: "Error querying categories from the database"}
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
-	// dbに保存
 	stmt, err := db.Prepare("INSERT INTO items (name, category_id, image_name) VALUES (?, ?, ?)")
 	if err != nil {
 		c.Logger().Errorf("Error INSERT INTO items: %s", err)
@@ -239,8 +240,6 @@ func getImg(c echo.Context) error {
 	// id+.jpg
 	imageFilename := c.Param("imageFilename")
 	imageJpg := imageFilename + ".jpg"
-	fmt.Println("imageFilename!!!!!!!!:%v:", imageJpg)
-
 	imgPath := path.Join(ImgDir, imageJpg)
 
 	//拡張子がjpgがチェック
@@ -259,22 +258,12 @@ func getImg(c echo.Context) error {
 		res := Response{Message: "Error Scan item"}
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
-	fmt.Println("row!!!!!!!!:%v:", row)
-	fmt.Println("imgPathById!!!!!!!!:%v:", imgPathById)
-	fmt.Println("imgPath!!!!!!!!:%v:", imgPath)
-
 	imgPath = path.Join(ImgDir, imgPathById)
-
-	fmt.Println("imgPath!??????!!:%v:", imgPath)
-
 	// ファイルが存在しないときはdefault.jpgを表示
 	if _, err := os.Stat(imgPath); err != nil {
-		fmt.Println("imgPath?????????!!!!!!!!:%v:", imgPath)
 		c.Logger().Errorf("Image not found: %s", err)
-		fmt.Print("Image not found: %s", err)
 		imgPath = path.Join(ImgDir, "default.jpg")
 	}
-	fmt.Println("imgPath#########:%v:", imgPath)
 	return c.File(imgPath)
 }
 
