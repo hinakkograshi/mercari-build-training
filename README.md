@@ -1,13 +1,25 @@
 # Build@Mercari Training Program 2024
 Build@Mercari 2024の個人課題です。
-Go言語でAPIを作成
-SQLiteデータベースを使用
-APIをdocker上で動かす
-CIサービスのGitHub Actionsを使用
-Webのフロントエンドを実装
-上記について学びました！
 
-This is @hinakkograshi's build training repository.
+**Go言語でAPIを作成**
+
+**SQLiteデータベースを使用**
+
+**APIをdocker上で動かす**
+
+**CIサービスのGitHub Actionsを使用**
+
+**Webのフロントエンドを実装**
+
+
+![Webのフロントエンド](https://github.com/hinakkograshi/mercari-build-training/assets/131275914/f90c4ecc-7ca8-48ba-9875-ad69522e1206)
+
+## +α SwiftでAPI通信のミニアプリを作成
+
+
+
+
+
 # Build@Mercari Training Program
 Build trainingの前半では個人で課題に取り組んでもらい、Web開発の基礎知識をつけていただきます。
 ドキュメントには詳細なやり方は記載しません。自身で検索したり、リファレンスを確認したり、チームメイトと協力して各課題をクリアしましょう。
