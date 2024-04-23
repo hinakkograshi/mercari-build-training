@@ -15,7 +15,10 @@ Build@Mercari 2024の個人課題です。
 ![Webのフロントエンド](https://github.com/hinakkograshi/mercari-build-training/assets/131275914/f90c4ecc-7ca8-48ba-9875-ad69522e1206)
 
 ## +α SwiftでAPI通信のミニアプリを作成
+https://github.com/hinakkograshi/HinakkoShopping/tree/develop
 
+
+![hinakkoshopping](https://github.com/hinakkograshi/mercari-build-training/assets/131275914/28aafbb7-c0b7-49df-bf51-305747f24fcb)
 
 
 
